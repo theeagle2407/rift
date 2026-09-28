@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {validateInterpretation} from '../src/lib/rift/research-contract.ts';
+const fixture=()=>({summary:'A stated scenario.',mechanism:'Premium offsets direction.',assumptions:['Costs are excluded.'],questions:['What is your holding period?'],evidenceIds:['C1'],proposal:{referenceMovePct:2,exitPremiumPct:null}});
+let n=0;const test=(label,fn)=>{fn();n++;console.log('PASS '+label);};
+test('Valid structured interpretation accepted',()=>assert.equal(validateInterpretation(fixture(),['T1','C1']).proposal.referenceMovePct,2));
+test('Missing historical evidence cannot be cited',()=>{const v=fixture();v.evidenceIds=['H1'];assert.throws(()=>validateInterpretation(v,['T1','C1']));});
+test('Model cannot propose moves outside the chart',()=>{const v=fixture();v.proposal.referenceMovePct=30;assert.throws(()=>validateInterpretation(v,['C1']));});
+test('Missing proposal fields fail validation',()=>{const v=fixture();delete v.proposal.exitPremiumPct;assert.throws(()=>validateInterpretation(v,['C1']));});
+test('Numeric strings are not silently applied',()=>{const v=fixture();v.proposal.referenceMovePct='2';assert.throws(()=>validateInterpretation(v,['C1']));});
+test('Empty explanation is rejected',()=>{const v=fixture();v.summary='';assert.throws(()=>validateInterpretation(v,['C1']));});
+test('Null proposals preserve user assumptions',()=>{const v=fixture();v.proposal.referenceMovePct=null;assert.equal(validateInterpretation(v,['C1']).proposal.referenceMovePct,null);});
+console.log(`${n} interpretation validation tests passed. No Gemini calls or keys.`);

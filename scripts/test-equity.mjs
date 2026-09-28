@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {EQUITY_MAP,parseRpc,unwrapMcp,normalizeQuote,normalizeProfile,normalizeEarnings} from '../src/lib/rift/equity-data.ts';
+const wrap=results=>({success:true,status_code:200,data:{provider:'fixture-provider',results}});
+const now=Date.parse('2026-09-17T13:00:00Z');
+const q={symbol:'NVDA',last_price:200,last_timestamp:'2026-09-17T12:30:00Z'};
+const test=(name,fn)=>{fn();console.log('PASS '+name);};
+test('Unverified and leveraged symbols are not guessed',()=>{assert.equal(EQUITY_MAP.NVDAUSDT,'NVDA');assert.equal(EQUITY_MAP.NVDLUSDT,undefined);assert.equal(EQUITY_MAP.SPYUSDT,undefined);});
+test('Quote observation time is preserved and absent currency stays unknown',()=>{const v=normalizeQuote(wrap([q]),'NVDA',now);assert.equal(v.observedAt,'2026-09-17T12:30:00.000Z');assert.equal(v.currency,null);});
+test('Wrong and duplicate quote identities fail',()=>{assert.throws(()=>normalizeQuote(wrap([q]),'TSLA',now));assert.throws(()=>normalizeQuote(wrap([q,q]),'NVDA',now));});
+test('Invalid price and ambiguous or future timestamps fail',()=>{for(const patch of [{last_price:null},{last_price:'200'},{last_price:0},{last_timestamp:null},{last_timestamp:'2026-09-17T12:30:00'},{last_timestamp:'2026-09-18T12:30:00Z'}])assert.throws(()=>normalizeQuote(wrap([{...q,...patch}]),'NVDA',now));});
+test('Missing company attributes remain null',()=>{const p=normalizeProfile(wrap([{symbol:'NVDA',name:'Nvidia'}]),'NVDA');assert.equal(p.exchange,null);assert.equal(p.industry,null);});
+test('Earnings validate identity and dates and filter to requested window',()=>{const e=normalizeEarnings(wrap([{symbol:'NVDA',report_date:'2026-11-17'},{symbol:'NVDA',report_date:'2026-08-01'}]),'NVDA','2026-09-17','2026-12-17');assert.deepEqual(e.dates,['2026-11-17']);assert.throws(()=>normalizeEarnings(wrap([{symbol:'TSLA',report_date:'2026-11-17'}]),'NVDA','2026-09-17','2026-12-17'));assert.throws(()=>normalizeEarnings(wrap([{symbol:'NVDA',report_date:'2026-02-30'}]),'NVDA','2026-01-01','2026-12-17'));});
+test('Empty earnings results are allowed without inventing a date',()=>assert.deepEqual(normalizeEarnings(wrap([]),'NVDA','2026-09-17','2026-12-17').dates,[]));
+test('JSON and SSE transport match request IDs',()=>{assert.deepEqual(parseRpc('event: message\r\ndata: {"jsonrpc":"2.0","id":2,"result":{}}\r\n\r\n',2).result,{});assert.throws(()=>parseRpc('{"id":3,"result":{}}',2));assert.throws(()=>parseRpc('{"id":2,"error":{"message":"fail"}}',2));});
+test('MCP tool errors and unsuccessful data envelopes fail',()=>{assert.throws(()=>unwrapMcp({result:{isError:true,structuredContent:{}}}));assert.throws(()=>normalizeQuote({success:false},'NVDA',now));assert.deepEqual(unwrapMcp({result:{content:[{type:'text',text:'{"ok":true}'}]}}),{ok:true});});
+console.log('9 stock-evidence tests passed. Synthetic fixtures; no credentials.');

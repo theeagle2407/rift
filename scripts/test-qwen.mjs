@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {qwenText} from '../src/lib/rift/qwen-response.ts';
+import {validateInterpretation} from '../src/lib/rift/research-contract.ts';
+const value={summary:'Scenario summary',mechanism:'Premium risk',assumptions:[],questions:[],evidenceIds:['C1'],proposal:{referenceMovePct:2,exitPremiumPct:null}};
+const response={status:'completed',output:[{type:'reasoning',content:[]},{type:'message',content:[{type:'output_text',text:JSON.stringify(value)}]}]};
+assert.equal(validateInterpretation(JSON.parse(qwenText(response)),['C1']).proposal.referenceMovePct,2);
+assert.equal(qwenText({status:'completed',output_text:'```json\n{}\n```'}),'{}');
+assert.throws(()=>qwenText({...response,status:'incomplete'}));
+assert.throws(()=>qwenText({...response,status:'failed'}));
+assert.throws(()=>qwenText({status:'completed',output:[]}));
+assert.throws(()=>qwenText({status:'completed',output:[{type:'message',content:[{type:'refusal'}]}]}));
+assert.throws(()=>validateInterpretation({...value,evidenceIds:['made-up']},['C1']));
+assert.throws(()=>validateInterpretation({...value,proposal:{referenceMovePct:99,exitPremiumPct:0}},['C1']));
+console.log('PASS Qwen parsing, completion, refusal, evidence and proposal validation (8 checks; no live requests)');
